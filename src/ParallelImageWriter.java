@@ -46,7 +46,7 @@ public class ParallelImageWriter {
     }
     private static void saveMimInParallel(BufferedImage[] biArray) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(NTHREADS);
-        Queue<Future<ImageSaveResult>> futureQueue = new ConcurrentLinkedQueue<Future<ImageSaveResult>>();
+        Queue<Future<ImageSaveResult>> futureQueue = new ConcurrentLinkedQueue<>();
 
         for (int i =0; i<NUM_JOBS;i++)
         {
@@ -55,7 +55,8 @@ public class ParallelImageWriter {
             futureQueue.add(submittedTask);
         }
 
-        executor.awaitTermination(1, TimeUnit.SECONDS);
+        executor.shutdown();
+        executor.awaitTermination(1, TimeUnit.MINUTES);
 
 
     }
@@ -69,7 +70,7 @@ public class ParallelImageWriter {
     }
     private static void saveJpegInParallel(BufferedImage[] biArray) throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(NTHREADS);
-        Queue<Future<ImageSaveResult>> futureQueue = new ConcurrentLinkedQueue<Future<ImageSaveResult>>();
+        Queue<Future<ImageSaveResult>> futureQueue = new ConcurrentLinkedQueue<>();
         for (int i =0; i<NUM_JOBS;i++)
         {
             Runnable task = new ImageWriterThread(biArray[i], "D:\\Deepak\\ImgPar"+i+".jpeg");
@@ -77,12 +78,15 @@ public class ParallelImageWriter {
             futureQueue.add(submittedTask);
         }
 
-        executor.awaitTermination(1, TimeUnit.SECONDS);
+        // tells executor to not accept new tasks. Without this, executor waits for the timeout to expire instead of the last executing task
+        executor.shutdown();
+
+        executor.awaitTermination(1, TimeUnit.MINUTES);
 
     }
     public static BufferedImage generateImage() {
 
-        int x, y = 0;
+        int x, y;
 
         // image block size in pixels, 1 is 1px, use smaller values for
 
