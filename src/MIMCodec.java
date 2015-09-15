@@ -2,17 +2,17 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
 import java.io.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 
 
 public class MIMCodec
 {
 
-    // Number of Bits per pixel
-    // TODO: REMOVE UNUSED private final static int BITS_PER_PIXEL_SIZE = 16;
-    // TODO: REMOVE UNUSED private static int wordCounter = 0;
     private static final int MIM_LIMIT = 65535;
-
 
     /**
      * This method writes gray scale image to MIM file.
@@ -88,30 +88,7 @@ public class MIMCodec
                 dsInfo.close();
         }
     }
-
-
-    /**
-     * This method reads gray scale image from MIM file.
-     * @param filePath This is a absolute path of file from where gray scale image
-     * is to be read.
-     * @return CougarGrayScaleImage This is actual image.
-     */
-//    public static CougarGrayScaleImage decode(String filePath) throws Exception
-//    {
-//        ParamUtil.verifyParamNotNull(filePath, "filePath", MIMCodec.class, "decode");
-//
-//        BufferedImage  bufferedImage  = decodeForBufferedImage(filePath);
-//        CougarGrayScaleImage cougarGrayScaleImage = null;
-//        int bitsPerPixel = bufferedImage.getColorModel().getPixelSize();
-//
-//        if(bitsPerPixel > 8)
-//            cougarGrayScaleImage = (CougarGrayScaleImageShort)
-//                              (CougarGrayScaleImageShort.create(bufferedImage));
-//        else
-//            cougarGrayScaleImage = (CougarGrayScaleImageByte)
-//                               (CougarGrayScaleImageByte.create(bufferedImage));
-//        return cougarGrayScaleImage;
-//    }
+    
 
     /**
      * This method reads gray scale image from MIM file.
@@ -126,7 +103,6 @@ public class MIMCodec
         BufferedImage bi = null;
         try
         {
-            // TODO: REMOVE UNUSED wordCounter = 0;
             int height = readShort(dsInfo);
             int width = readShort(dsInfo);
             Dimension imageSize = new Dimension(width, height);
@@ -136,7 +112,7 @@ public class MIMCodec
             DataBuffer dataBuffer = raster.getDataBuffer();
 
             byte[] cachedData = new byte[width  * 2];
-            int index = 0;
+            int index;
             short byte0;
             short byte1;
             int grayValue;
@@ -159,20 +135,138 @@ public class MIMCodec
         }
         finally
         {
-            if(dsInfo!=null)
-                dsInfo.close();
+            dsInfo.close();
+        }
+        return bi;
+    }
+    
+    
+    public static BufferedImage decodeForBufferedImage2(String filePath) throws Exception
+    {
+        // create a data input stream
+        DataInputStream dsInfo = new DataInputStream(new FileInputStream(filePath));
+        BufferedImage bi = null;
+        try
+        {
+            int height = readShort(dsInfo);
+            int width = readShort(dsInfo);
+            
+            byte[] buffData = new byte[height * width * 2];
+            
+            dsInfo.read(buffData, 0, buffData.length);
+            ByteBuffer bb = ByteBuffer.wrap(buffData);
+            bb.order(ByteOrder.LITTLE_ENDIAN);
+            
+            int len = height * width;
+            ShortBuffer sb = bb.asShortBuffer();
+            
+            int[] intArray = new int[len];
+            for (int i=0;i<len; i++) {
+            	intArray[i] = sb.get(i);
+            }
+            
+            bi = new BufferedImage(width, height,
+                    BufferedImage.TYPE_USHORT_GRAY);
+            
+            WritableRaster wr = bi.getRaster();
+            wr.setPixels(0, 0, width, height, intArray);
+	     }
+	     finally
+	     {
+             dsInfo.close();
+	     }
+	     return bi;
+     }
+    public static BufferedImage decodeForBufferedImage3(String filePath) throws Exception
+    {
+        // create a data input stream
+        DataInputStream dsInfo = new DataInputStream(new FileInputStream(filePath));
+        BufferedImage bi = null;
+        try
+        {
+            int height = readShort(dsInfo);
+            int width = readShort(dsInfo);
+
+            bi = new BufferedImage(width, height,
+                    BufferedImage.TYPE_USHORT_GRAY);
+            WritableRaster raster = bi.getRaster();
+            DataBuffer dataBuffer = raster.getDataBuffer();
+
+            byte[] cachedData = new byte[width  * 2];
+            int index = 0;
+            for (int x = 0; x<height;x++) {
+                dsInfo.read(cachedData, 0, cachedData.length);
+                ByteBuffer bb = ByteBuffer.wrap(cachedData);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                ShortBuffer sb = bb.asShortBuffer();
+                for (int i=0;i<width; i++) {
+                    dataBuffer.setElem(x*width + i, sb.get(i));
+                }        	
+            }
+            bi.setData(raster);
+            
+	     }
+	     finally
+	     {
+             dsInfo.close();
+	     }
+	     return bi;
+     }
+    
+	public static BufferedImage decodeForBufferedImage1(String filePath) throws Exception
+    {
+        // create a data input stream
+        DataInputStream dsInfo = new DataInputStream(new FileInputStream(filePath));
+        BufferedImage bi = null;
+        try
+        {
+            int height = readShort(dsInfo);
+            int width = readShort(dsInfo);
+            Dimension imageSize = new Dimension(width, height);
+            bi = new BufferedImage(imageSize.width, imageSize.height,
+                                                 BufferedImage.TYPE_USHORT_GRAY);
+            Raster raster = bi.getRaster();
+            DataBuffer dataBuffer = raster.getDataBuffer();
+
+            byte[] cachedData = new byte[width  * 2];
+
+            for (int y = 0; y < height; y++)
+            {
+                ByteBuffer bb = ByteBuffer.allocate(width*4);
+                dsInfo.read(cachedData, 0, cachedData.length);
+                bb.order(ByteOrder.LITTLE_ENDIAN);
+                bb.put(cachedData);
+                ShortBuffer sb = bb.asShortBuffer();
+                short[] dst = new short[width];
+                sb.position(0);
+                sb.get(dst);
+                for (int x = 0; x < width; x++)
+                {
+                    dataBuffer.setElem(x + (y*width), dst[x]);                	
+                }
+            }
+            bi.setData(raster);
+        }
+        finally
+        {
+            dsInfo.close();
         }
         return bi;
     }
 
+    // The MIM files are normally created by in C++. 
+	// So it is necessary to swap 2 bytes to get Java 'integers
+    // numbers from C++ integer.
+    // The numbers in Java are Big Endians but integers saved in MIM file are
+    // little Endian so bytes which we read in the beginning are considered as
+    // little significant bytes while constructing Java integers. The Java integers
+    // are 4 bytes but here we are only using lower 2 bytes.
     private static int readShort(DataInputStream din)
             throws IOException
     {
         int lower = din.readUnsignedByte() & 0x00ff;
         int upper = din.readUnsignedByte() & 0x00ff;
-        int data = (( upper << 8 ) | lower);
-
-        return data;
+        return (( upper << 8 ) | lower);
     }
 
     private static void writeShort(DataOutputStream dout, int value)
